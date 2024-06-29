@@ -2,6 +2,13 @@ ifneq ($(CONFIG_ARCH_QTI_VM), y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_LAHAINA) += lahaina-rumi-overlay.dtbo \
 	lahaina-mtp-overlay.dtbo \
+	cetus-sm8350-overlay.dtbo \
+	star-sm8350-overlay.dtbo \
+	odin-sm8350-overlay.dtbo \
+	venus-sm8350-overlay.dtbo \
+	haydn-sm8350-overlay.dtbo \
+	mars-sm8350-overlay.dtbo \
+	vili-sm8350-overlay.dtbo \
 	lahaina-mtp-hsp-overlay.dtbo \
 	lahaina-cdp-overlay.dtbo \
 	lahaina-qrd-overlay.dtbo \
@@ -24,6 +31,13 @@ dtbo-$(CONFIG_ARCH_LAHAINA) += lahaina-rumi-overlay.dtbo \
 
 lahaina-rumi-overlay.dtbo-base := lahaina.dtb
 lahaina-mtp-hsp-overlay.dtbo-base := lahaina.dtb
+cetus-sm8350-overlay.dtbo-base := lahaina.dtb
+star-sm8350-overlay.dtbo-base := lahaina.dtb
+odin-sm8350-overlay.dtbo-base := lahaina.dtb
+venus-sm8350-overlay.dtbo-base := lahaina.dtb
+haydn-sm8350-overlay.dtbo-base := lahaina.dtb
+mars-sm8350-overlay.dtbo-base := lahaina.dtb
+vili-sm8350-overlay.dtbo-base := lahaina.dtb
 lahaina-mtp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 lahaina-cdp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
 lahaina-atp-overlay.dtbo-base := lahaina.dtb lahaina-v2.dtb lahaina-v2.1.dtb
@@ -194,6 +208,7 @@ endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_SHIMA) +=    \
+	renoir-sm7350-overlay.dtbo	\
 	shima-rumi-overlay.dtbo \
 	shima-idp-overlay.dtbo  \
 	shima-idp-120fps-overlay.dtbo \
@@ -202,6 +217,7 @@ dtbo-$(CONFIG_ARCH_SHIMA) +=    \
 	shima-idps-digital-mics-overlay.dtbo \
 	shima-idps-digital-mics-120fps-overlay.dtbo
 
+renoir-sm7350-overlay.dtbo-base := shima.dtb
 shima-rumi-overlay.dtbo-base := shima.dtb
 shima-idp-overlay.dtbo-base := shima.dtb
 shima-idp-120fps-overlay.dtbo-base := shima.dtb
@@ -221,6 +237,11 @@ endif
 
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_YUPIK) +=    \
+	lisa-sm7325-overlay.dtbo \
+	mona-sm7325-overlay.dtbo \
+	taoyao-sm7325-overlay.dtbo \
+	zijin-sm7325-overlay.dtbo \
+	redwood-sm7325-overlay.dtbo \
 	yupik-rumi-overlay.dtbo \
 	yupik-idp-overlay.dtbo \
 	yupik-atp-overlay.dtbo \
@@ -254,7 +275,11 @@ dtbo-$(CONFIG_ARCH_YUPIK) +=    \
 	katmaip-fp2-hsp-pm7250b-overlay.dtbo \
 	yupikp-iot-idps-amoled-overlay.dtbo
 
-
+lisa-sm7325-overlay.dtbo-base := yupik.dtb
+mona-sm7325-overlay.dtbo-base := yupik.dtb
+taoyao-sm7325-overlay.dtbo-base := yupik.dtb
+zijin-sm7325-overlay.dtbo-base := yupik.dtb
+redwood-sm7325-overlay.dtbo-base := yupik.dtb
 yupik-rumi-overlay.dtbo-base := yupik.dtb
 yupik-idp-overlay.dtbo-base := yupik.dtb
 yupik-atp-overlay.dtbo-base := yupik.dtb

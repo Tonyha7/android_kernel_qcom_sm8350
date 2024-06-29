@@ -239,11 +239,7 @@ static inline char *dp_phy_aux_config_type_to_string(u32 cfg_type)
  * @fec_feature_enable: FEC feature enable status
  * @dsc_continuous_pps: PPS sent every frame by HW
  * @has_widebus: widebus (2PPC) feature eanble status
- * @bl_min_level: minimum brightness value for backlight
- * @bl_max_level: maximum brightness value for backlight
- * @brightness_max_level: maximum brightness level for backlight
- * @pwm_period_usecs: pwm period in usecs for backlight pwm
- * @mst_fixed_port: mst port_num reserved for fixed topology
+  *@mst_fixed_port: mst port_num reserved for fixed topology
  * @parse: function to be called by client to parse device tree.
  * @get_io: function to be called by client to get io data.
  * @get_io_buf: function to be called by client to get io buffers.

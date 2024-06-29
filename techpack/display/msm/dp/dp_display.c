@@ -2694,9 +2694,6 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 {
 	struct dp_display_private *dp;
 	struct dp_panel *dp_panel;
-	struct drm_connector *connector;
-	struct sde_connector *sde_conn;
-	struct backlight_device *bl_device;
 	int rc = 0;
 
 	if (!dp_display || !panel) {
@@ -2741,15 +2738,6 @@ static int dp_display_post_enable(struct dp_display *dp_display, void *panel)
 		if (rc) {
 			DP_ERR("Cannot turn edp backlight power on");
 			goto end;
-		}
-		connector = dp_display->base_connector;
-		sde_conn = to_sde_connector(connector);
-
-		sde_conn->allow_bl_update = true;
-		if (sde_conn->bl_device) {
-			bl_device = sde_conn->bl_device;
-			bl_device->props.power = FB_BLANK_UNBLANK;
-			bl_device->props.state &= ~BL_CORE_FBBLANK;
 		}
 	}
 
@@ -4111,7 +4099,6 @@ static int dp_display_probe(struct platform_device *pdev)
 	dp_display->wakeup_phy_layer =
 					dp_display_wakeup_phy_layer;
 	dp_display->set_colorspace = dp_display_setup_colospace;
-	dp_display->set_backlight = dp_display_set_backlight;
 	dp_display->get_available_dp_resources =
 					dp_display_get_available_dp_resources;
 	dp_display->get_display_type = dp_display_get_display_type;

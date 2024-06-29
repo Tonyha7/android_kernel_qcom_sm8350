@@ -9,6 +9,9 @@
 #include <linux/of_gpio.h>
 #include <linux/err.h>
 
+#include <drm/mi_disp_notifier.h>
+#include <drm/dsi_display_fod.h>
+
 #include "msm_drv.h"
 #include "sde_connector.h"
 #include "msm_mmu.h"
@@ -21,6 +24,7 @@
 #include "dsi_pwr.h"
 #include "sde_dbg.h"
 #include "dsi_parser.h"
+#include "mi_dsi_display.h"
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
 #define INT_BASE_10 10
@@ -38,6 +42,9 @@
 #define SEC_PANEL_NAME_MAX_LEN  256
 
 u8 dbgfs_tx_cmd_buf[SZ_4K];
+
+struct dsi_display *primary_display;
+
 static char dsi_display_primary[MAX_CMDLINE_PARAM_LEN];
 static char dsi_display_secondary[MAX_CMDLINE_PARAM_LEN];
 static struct dsi_display_boot_param boot_displays[MAX_DSI_ACTIVE_DISPLAY] = {
@@ -1240,6 +1247,8 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
+	struct mi_disp_notifier notify_data;
+	int disp_id = 0;
 	int rc = 0;
 
 	if (!display || !display->panel) {
@@ -1247,18 +1256,27 @@ int dsi_display_set_power(struct drm_connector *connector,
 		return -EINVAL;
 	}
 
+	disp_id = mi_get_disp_id(display);
+
+	notify_data.data = &power_mode;
+	notify_data.disp_id = disp_id;
+
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		mi_disp_notifier_call_chain(MI_DISP_DPMS_EARLY_EVENT, &notify_data);
 		if (display->panel->power_mode == SDE_MODE_DPMS_LP2) {
 			if (dsi_display_set_ulp_load(display, false) < 0)
 				DSI_WARN("failed to set load for lp1 state\n");
 		}
 		rc = dsi_panel_set_lp1(display->panel);
+		mi_disp_notifier_call_chain(MI_DISP_DPMS_EVENT, &notify_data);
 		break;
 	case SDE_MODE_DPMS_LP2:
+		mi_disp_notifier_call_chain(MI_DISP_DPMS_EARLY_EVENT, &notify_data);
 		rc = dsi_panel_set_lp2(display->panel);
 		if (dsi_display_set_ulp_load(display, true) < 0)
 			DSI_WARN("failed to set load for lp2 state\n");
+		mi_disp_notifier_call_chain(MI_DISP_DPMS_EVENT, &notify_data);
 		break;
 	case SDE_MODE_DPMS_ON:
 		if (display->panel->power_mode == SDE_MODE_DPMS_LP2) {
@@ -1266,8 +1284,11 @@ int dsi_display_set_power(struct drm_connector *connector,
 				DSI_WARN("failed to set load for on state\n");
 		}
 		if ((display->panel->power_mode == SDE_MODE_DPMS_LP1) ||
-			(display->panel->power_mode == SDE_MODE_DPMS_LP2))
+			(display->panel->power_mode == SDE_MODE_DPMS_LP2)) {
+			mi_disp_notifier_call_chain(MI_DISP_DPMS_EARLY_EVENT, &notify_data);
 			rc = dsi_panel_set_nolp(display->panel);
+			mi_disp_notifier_call_chain(MI_DISP_DPMS_EVENT, &notify_data);
+		}
 		break;
 	case SDE_MODE_DPMS_OFF:
 	default:
@@ -5642,6 +5663,81 @@ static int dsi_display_pre_acquire(void *data)
 	return 0;
 }
 
+int dsi_display_get_fps(struct dsi_display *display, u32 *fps)
+{
+	struct dsi_display_mode *cur_mode = NULL;
+	int ret = 0;
+
+	if (!display || !display->panel) {
+		DSI_ERR("Invalid display/panel ptr\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&display->display_lock);
+	cur_mode = display->panel->cur_mode;
+	if (cur_mode) {
+		*fps =  cur_mode->timing.refresh_rate;
+	} else {
+		ret = -EINVAL;
+	}
+	mutex_unlock(&display->display_lock);
+
+	return ret;
+}
+
+static ssize_t dynamic_fps_show(struct device *dev, struct device_attribute *attr,
+				 char *buf)
+{
+	struct dsi_display *display;
+	u32 fps = 0;
+	int rc = 0;
+
+	struct platform_device *pdev = to_platform_device(dev);
+	display = platform_get_drvdata(pdev);
+
+	if (!display) {
+		DSI_ERR("Invalid display\n");
+		return -EINVAL;
+	}
+
+	rc = dsi_display_get_fps(display, &fps);
+	if (rc) {
+		DSI_ERR("%s: failed to get fps. rc=%d\n", __func__, rc);
+		return snprintf(buf, PAGE_SIZE, "%s\n", "null");
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", fps);
+}
+static DEVICE_ATTR_RO(dynamic_fps);
+
+static struct attribute *mi_display_attrs[] = {
+	&dev_attr_dynamic_fps.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(mi_display);
+
+void dsi_mi_display_init(struct dsi_display *display) {
+	int disp_id = mi_get_disp_id(display);
+
+	if (IS_ERR_OR_NULL(display->class)) {
+		display->class = class_create(THIS_MODULE, "mi_display");
+		if (IS_ERR(display->class))
+			DSI_ERR("class_create failed, rc: %d\n", PTR_ERR(display->class));
+	}
+
+	if (IS_ERR_OR_NULL(display->dev)) {
+		display->dev = device_create_with_groups(display->class, &display->pdev->dev,
+				0, display, mi_display_groups, "disp-DSI-%d", disp_id);
+		if (IS_ERR(display->dev))
+			DSI_ERR("device_create_with_groups failed for disp-DSI-%d, ret: %d\n", disp_id, PTR_ERR(display->dev));
+	}
+}
+
+void dsi_mi_display_deinit(struct dsi_display *display) {
+	device_unregister(display->dev);
+	class_destroy(display->class);
+}
+
 /**
  * dsi_display_bind - bind dsi device with controlling device
  * @dev:        Pointer to base of platform device
@@ -5851,6 +5947,8 @@ static int dsi_display_bind(struct device *dev,
 
 	msm_register_vm_event(master, dev, &vm_event_ops, (void *)display);
 
+	dsi_mi_display_init(display);
+
 	goto error;
 
 error_host_deinit:
@@ -5923,6 +6021,8 @@ static void dsi_display_unbind(struct device *dev,
 
 	atomic_set(&display->clkrate_change_pending, 0);
 	(void)dsi_display_debugfs_deinit(display);
+
+	dsi_mi_display_deinit(display);
 
 	mutex_unlock(&display->display_lock);
 }
@@ -6011,6 +6111,17 @@ static void dsi_display_firmware_display(const struct firmware *fw,
 	DSI_DEBUG("success\n");
 }
 
+static struct dsi_display *dsi_display_get_primary(void) {
+	return primary_display;
+}
+
+void dsi_display_primary_request_fod_hbm(bool status)
+{
+	struct dsi_display *display = dsi_display_get_primary();
+	dsi_panel_request_fod_hbm(display->panel, status);
+}
+EXPORT_SYMBOL(dsi_display_primary_request_fod_hbm);
+
 int dsi_display_dev_probe(struct platform_device *pdev)
 {
 	struct dsi_display *display = NULL;
@@ -6062,6 +6173,8 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 	if (!strcmp(display->display_type, "secondary"))
 		index = DSI_SECONDARY;
 
+	display->display_selection_type = index;
+
 	boot_disp = &boot_displays[index];
 	node = pdev->dev.of_node;
 	if (boot_disp->boot_disp_en) {
@@ -6110,6 +6223,8 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 		if (rc)
 			goto end;
 	}
+
+	primary_display = display;
 
 	return 0;
 end:
@@ -7469,6 +7584,8 @@ int dsi_display_set_mode(struct dsi_display *display,
 	int rc = 0;
 	struct dsi_display_mode adj_mode;
 	struct dsi_mode_info timing;
+	struct mi_disp_notifier notify_data;
+	int fps;
 
 	if (!display || !mode || !display->panel) {
 		DSI_ERR("Invalid params\n");
@@ -7511,6 +7628,14 @@ int dsi_display_set_mode(struct dsi_display *display,
 			timing.h_active, timing.v_active, timing.refresh_rate);
 	SDE_EVT32(adj_mode.priv_info->mdp_transfer_time_us,
 			timing.h_active, timing.v_active, timing.refresh_rate);
+
+	if (display->panel->cur_mode->timing.refresh_rate != timing.refresh_rate) {
+		fps = timing.refresh_rate;
+		notify_data.data = &fps;
+		notify_data.disp_id = mi_get_disp_id(display);
+		mi_disp_notifier_call_chain(MI_DISP_FPS_CHANGE_EVENT, &notify_data);
+		sysfs_notify(&display->dev->kobj, NULL, "dynamic_fps");
+	}
 
 	memcpy(display->panel->cur_mode, &adj_mode, sizeof(adj_mode));
 error:

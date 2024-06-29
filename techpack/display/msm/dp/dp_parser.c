@@ -908,7 +908,6 @@ static int dp_parser_parse(struct dp_parser *parser)
 	if (rc)
 		goto err;
 
-	dp_parser_bl_config(parser);
 	dp_parser_dsc(parser);
 	dp_parser_fec(parser);
 	dp_parser_widebus(parser);
